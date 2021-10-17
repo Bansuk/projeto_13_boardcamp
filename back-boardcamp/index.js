@@ -18,11 +18,16 @@ app.get("/categories", async (req, res) => {
 
 app.post("/categories", async (req, res) => {
     const { name } = req.body;
+    let result;
 
-    const result = await connection.query(
-        "SELECT * FROM categories WHERE name = $1;",
-        [name]
-    );
+    try {
+        result = await connection.query(
+            "SELECT * FROM categories WHERE name = $1;",
+            [name]
+        );
+    } catch (error) {
+        res.sendStatus(500);
+    }
 
     if (!name) res.sendStatus(400);
     else if (result.rowCount) res.sendStatus(409);
@@ -31,6 +36,41 @@ app.post("/categories", async (req, res) => {
             await connection.query(
                 "INSERT INTO categories (name) VALUES ($1);",
                 [name]
+            );
+            res.sendStatus(201);
+        } catch (error) {
+            res.sendStatus(500);
+        }
+    }
+});
+
+app.post("/games", async (req, res) => {
+    const { name, image, stockTotal, categoryId, pricePerDay } = req.body;
+    let categoryIds, names;
+
+    try {
+        categoryIds = await connection.query("SELECT id FROM categories;");
+        names = await connection.query(
+            "SELECT name FROM games WHERE name = $1;",
+            [name]
+        );
+    } catch (error) {
+        res.sendStatus(500);
+    }
+
+    if (
+        !name ||
+        stockTotal <= 0 ||
+        pricePerDay <= 0 ||
+        !categoryIds.rows.filter(value => value.id === categoryId).length
+    )
+        res.sendStatus(400);
+    else if (names.rowCount) res.sendStatus(409);
+    else {
+        try {
+            await connection.query(
+                'INSERT INTO games (name, image, "stockTotal", "categoryId", "pricePerDay") VALUES ($1, $2, $3, $4, $5);',
+                [name, image, stockTotal, categoryId, pricePerDay]
             );
             res.sendStatus(201);
         } catch (error) {
