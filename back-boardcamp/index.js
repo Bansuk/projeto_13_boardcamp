@@ -44,6 +44,22 @@ app.post("/categories", async (req, res) => {
     }
 });
 
+app.get("/games", async (req, res) => {
+    let name = req.query.name;
+
+    if (!name) name = "";
+
+    try {
+        const result = await connection.query(
+            'SELECT games.*, categories.name AS "categoryName" FROM games JOIN categories ON games."categoryId" = categories.id WHERE games.name ILIKE $1;',
+            [name + "%"]
+        );
+        res.send(result.rows);
+    } catch (error) {
+        res.sendStatus(500);
+    }
+});
+
 app.post("/games", async (req, res) => {
     const { name, image, stockTotal, categoryId, pricePerDay } = req.body;
     let categoryIds, names;
