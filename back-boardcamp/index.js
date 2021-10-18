@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import connection from "../database/database.js";
+import { categoriesSchema, customersSchema } from "./schemes.js";
 
 const app = express();
 
@@ -29,7 +30,7 @@ app.post("/categories", async (req, res) => {
         res.sendStatus(500);
     }
 
-    if (!name) res.sendStatus(400);
+    if (categoriesSchema.validate(req.body).error) res.sendStatus(400);
     else if (result.rowCount) res.sendStatus(409);
     else {
         try {
@@ -87,6 +88,35 @@ app.post("/games", async (req, res) => {
             await connection.query(
                 'INSERT INTO games (name, image, "stockTotal", "categoryId", "pricePerDay") VALUES ($1, $2, $3, $4, $5);',
                 [name, image, stockTotal, categoryId, pricePerDay]
+            );
+            res.sendStatus(201);
+        } catch (error) {
+            res.sendStatus(500);
+        }
+    }
+});
+
+//Customers
+app.post("/customers", async (req, res) => {
+    const { name, phone, cpf, birthday } = req.body;
+    let result;
+
+    try {
+        result = await connection.query(
+            "SELECT cpf FROM customers WHERE cpf = $1",
+            [cpf]
+        );
+    } catch (error) {
+        res.sendStatus(500);
+    }
+
+    if (customersSchema.validate(req.body).error) res.sendStatus(400);
+    else if (result.rowCount) res.sendStatus(409);
+    else {
+        try {
+            await connection.query(
+                "INSERT INTO customers (name, phone, cpf, birthday) VALUES ($1, $2, $3, $4);",
+                [name, phone, cpf, birthday]
             );
             res.sendStatus(201);
         } catch (error) {
