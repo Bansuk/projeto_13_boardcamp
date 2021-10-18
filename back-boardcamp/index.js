@@ -97,6 +97,22 @@ app.post("/games", async (req, res) => {
 });
 
 //Customers
+app.get("/customers", async (req, res) => {
+    let cpf = req.query.cpf;
+
+    if (!cpf) cpf = "";
+
+    try {
+        const result = await connection.query(
+            "SELECT * FROM customers WHERE cpf LIKE $1;",
+            [cpf + "%"]
+        );
+        res.send(result.rows);
+    } catch (error) {
+        res.sendStatus(500);
+    }
+});
+
 app.post("/customers", async (req, res) => {
     const { name, phone, cpf, birthday } = req.body;
     let result;
