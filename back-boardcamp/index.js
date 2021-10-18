@@ -113,6 +113,20 @@ app.get("/customers", async (req, res) => {
     }
 });
 
+app.get("/customers/:id", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await connection.query(
+            "SELECT * FROM customers WHERE id = $1;",
+            [id]
+        );
+        result.rowCount ? res.send(result.rows) : res.sendStatus(404);
+    } catch (error) {
+        res.sendStatus(500);
+    }
+});
+
 app.post("/customers", async (req, res) => {
     const { name, phone, cpf, birthday } = req.body;
     let result;
