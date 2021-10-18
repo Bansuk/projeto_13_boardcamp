@@ -186,6 +186,34 @@ app.put("/customers/:id", async (req, res) => {
 });
 
 //Rentals
+app.get("/rentals", async (req, res) => {
+    let customerId = req.query.customerId;
+    let gameId = req.query.gameId;
+
+    try {
+        if (customerId) {
+            const result = await connection.query(
+                'SELECT rentals.*, customers.id, customers.name, games.id, games.name, games."categoryId", categories.name FROM rentals JOIN customers ON rentals."customerId" = customers.id JOIN games ON rentals."gameId" = games.id JOIN categories ON games."categoryId" = categories.id WHERE rentals."customerId" = $1;',
+                [customerId]
+            );
+            res.send(result.rows);
+        } else if (gameId) {
+            const result = await connection.query(
+                'SELECT rentals.*, customers.id, customers.name, games.id, games.name, games."categoryId", categories.name FROM rentals JOIN customers ON rentals."customerId" = customers.id JOIN games ON rentals."gameId" = games.id JOIN categories ON games."categoryId" = categories.id WHERE rentals."gameId" = $1;',
+                [gameId]
+            );
+            res.send(result.rows);
+        } else {
+            const result = await connection.query(
+                'SELECT rentals.*, customers.id, customers.name, games.id, games.name, games."categoryId", categories.name FROM rentals JOIN customers ON rentals."customerId" = customers.id JOIN games ON rentals."gameId" = games.id JOIN categories ON games."categoryId" = categories.id;'
+            );
+            res.send(result.rows);
+        }
+    } catch (error) {
+        res.sendStatus(500);
+    }
+});
+
 app.post("/rentals", async (req, res) => {
     const { customerId, gameId, daysRented } = req.body;
 
