@@ -125,4 +125,33 @@ app.post("/customers", async (req, res) => {
     }
 });
 
+app.put("/customers/:id", async (req, res) => {
+    const { id } = req.params;
+    const { name, phone, cpf, birthday } = req.body;
+    let result;
+
+    try {
+        result = await connection.query(
+            "SELECT cpf FROM customers WHERE cpf = $1",
+            [cpf]
+        );
+    } catch (error) {
+        res.sendStatus(500);
+    }
+
+    if (customersSchema.validate(req.body).error) res.sendStatus(400);
+    else if (result.rowCount) res.sendStatus(409);
+    else {
+        try {
+            await connection.query(
+                "UPDATE customers SET name = $1, phone = $2, cpf = $3, birthday = $4 WHERE id = $5;",
+                [name, phone, cpf, birthday, id]
+            );
+            res.sendStatus(200);
+        } catch (error) {
+            res.sendStatus(500);
+        }
+    }
+});
+
 app.listen(4000);
