@@ -228,4 +228,26 @@ app.post("/rentals", async (req, res) => {
     }
 });
 
+app.delete("/rentals/:id", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const wasReturned = await connection.query(
+            'SELECT "returnDate" FROM rentals WHERE id = $1 AND "returnDate" IS NOT NULL;',
+            [id]
+        );
+
+        if (wasReturned.rowCount) res.sendStatus(400);
+        else {
+            const result = await connection.query(
+                "DELETE FROM rentals WHERE id = $1;",
+                [id]
+            );
+            result.rowCount ? res.sendStatus(200) : res.sendStatus(404);
+        }
+    } catch (error) {
+        res.sendStatus(500);
+    }
+});
+
 app.listen(4000);
