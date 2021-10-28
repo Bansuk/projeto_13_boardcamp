@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import connection from "../database/database.js";
-import { categoriesSchema, customersSchema } from "./schemes.js";
+import { categoriesSchema, gamesSchema, customersSchema } from "./schemes.js";
 
 const DAYS_MILISECONDS = 24 * 60 * 60 * 1000;
 
@@ -64,36 +64,31 @@ app.get("/games", async (req, res) => {
 
 app.post("/games", async (req, res) => {
     const { name, image, stockTotal, categoryId, pricePerDay } = req.body;
-    let categoryIds, names;
 
     try {
-        categoryIds = await connection.query("SELECT id FROM categories;");
-        names = await connection.query(
+        const categoryIds = await connection.query(
+            "SELECT id FROM categories;"
+        );
+        const names = await connection.query(
             "SELECT name FROM games WHERE name = $1;",
             [name]
         );
-    } catch (error) {
-        res.sendStatus(500);
-    }
 
-    if (
-        !name ||
-        stockTotal <= 0 ||
-        pricePerDay <= 0 ||
-        !categoryIds.rows.filter(value => value.id === categoryId).length
-    )
-        res.sendStatus(400);
-    else if (names.rowCount) res.sendStatus(409);
-    else {
-        try {
+        if (
+            gamesSchema.validate(req.body).error ||
+            !categoryIds.rows.filter(value => value.id === categoryId).length
+        )
+            res.sendStatus(400);
+        else if (names.rowCount) res.sendStatus(409);
+        else {
             await connection.query(
                 'INSERT INTO games (name, image, "stockTotal", "categoryId", "pricePerDay") VALUES ($1, $2, $3, $4, $5);',
                 [name, image, stockTotal, categoryId, pricePerDay]
             );
             res.sendStatus(201);
-        } catch (error) {
-            res.sendStatus(500);
         }
+    } catch (error) {
+        res.sendStatus(500);
     }
 });
 
@@ -130,65 +125,55 @@ app.get("/customers/:id", async (req, res) => {
 
 app.post("/customers", async (req, res) => {
     const { name, phone, cpf, birthday } = req.body;
-    let result;
 
     try {
-        result = await connection.query(
+        const result = await connection.query(
             "SELECT cpf FROM customers WHERE cpf = $1",
             [cpf]
         );
-    } catch (error) {
-        res.sendStatus(500);
-    }
 
-    if (customersSchema.validate(req.body).error) res.sendStatus(400);
-    else if (result.rowCount) res.sendStatus(409);
-    else {
-        try {
+        if (customersSchema.validate(req.body).error) res.sendStatus(400);
+        else if (result.rowCount) res.sendStatus(409);
+        else {
             await connection.query(
                 "INSERT INTO customers (name, phone, cpf, birthday) VALUES ($1, $2, $3, $4);",
                 [name, phone, cpf, birthday]
             );
             res.sendStatus(201);
-        } catch (error) {
-            res.sendStatus(500);
         }
+    } catch (error) {
+        res.sendStatus(500);
     }
 });
 
 app.put("/customers/:id", async (req, res) => {
     const { id } = req.params;
     const { name, phone, cpf, birthday } = req.body;
-    let result;
 
     try {
-        result = await connection.query(
+        const result = await connection.query(
             "SELECT cpf FROM customers WHERE cpf = $1",
             [cpf]
         );
-    } catch (error) {
-        res.sendStatus(500);
-    }
 
-    if (customersSchema.validate(req.body).error) res.sendStatus(400);
-    else if (result.rowCount) res.sendStatus(409);
-    else {
-        try {
+        if (customersSchema.validate(req.body).error) res.sendStatus(400);
+        else if (result.rowCount) res.sendStatus(409);
+        else {
             await connection.query(
                 "UPDATE customers SET name = $1, phone = $2, cpf = $3, birthday = $4 WHERE id = $5;",
                 [name, phone, cpf, birthday, id]
             );
             res.sendStatus(200);
-        } catch (error) {
-            res.sendStatus(500);
         }
+    } catch (error) {
+        res.sendStatus(500);
     }
 });
 
 //Rentals
 app.get("/rentals", async (req, res) => {
-    let customerId = req.query.customerId;
-    let gameId = req.query.gameId;
+    const customerId = req.query.customerId;
+    const gameId = req.query.gameId;
 
     try {
         if (customerId) {
@@ -260,6 +245,8 @@ app.post("/rentals", async (req, res) => {
 
 app.post("/rentals/:id/return", async (req, res) => {
     const { id } = req.params;
+    const now = new Date();
+    let delayFee = null;
 
     try {
         const result = await connection.query(
@@ -270,25 +257,21 @@ app.post("/rentals/:id/return", async (req, res) => {
         if (!result.rowCount) res.sendStatus(404);
         else if (result.rows[0].returnDate) res.sendStatus(400);
         else {
-            await connection.query(
-                'UPDATE rentals SET "returnDate" = CURRENT_DATE WHERE id = $1;',
-                [id]
+            const keptDays = Math.floor(
+                (now.getTime() - result.rows[0].rentDate.getTime()) /
+                    DAYS_MILISECONDS
             );
 
-            const keptDays =
-                (result.rows[0].returnDate - result.rows[0].rentDate) /
-                DAYS_MILISECONDS;
-
             if (keptDays > result.rows[0].daysRented) {
-                const delayFee =
+                delayFee =
                     (keptDays - result.rows[0].daysRented) *
                     result.rows[0].originalPrice;
-
-                await connection.query(
-                    'UPDATE rentals SET "delayFee" = $1 WHERE id = $2;',
-                    [delayFee, id]
-                );
             }
+
+            await connection.query(
+                'UPDATE rentals SET "returnDate" = CURRENT_DATE, "delayFee" = $1 WHERE id = $2;',
+                [delayFee, id]
+            );
 
             res.sendStatus(200);
         }
