@@ -3,6 +3,8 @@ import cors from "cors";
 import connection from "../database/database.js";
 import { categoriesSchema, customersSchema } from "./schemes.js";
 
+const DAYS_MILISECONDS = 24 * 60 * 60 * 1000;
+
 const app = express();
 
 app.use(express.json());
@@ -222,6 +224,45 @@ app.post("/rentals", async (req, res) => {
                 [customerId, gameId, daysRented, pricePerDay]
             );
             res.sendStatus(201);
+        }
+    } catch (error) {
+        res.sendStatus(500);
+    }
+});
+
+app.post("/rentals/:id/return", async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await connection.query(
+            "SELECT * FROM rentals WHERE id = $1",
+            [id]
+        );
+
+        if (!result.rowCount) res.sendStatus(404);
+        else if (result.rows[0].returnDate) res.sendStatus(400);
+        else {
+            await connection.query(
+                'UPDATE rentals SET "returnDate" = CURRENT_DATE WHERE id = $1;',
+                [id]
+            );
+
+            const keptDays =
+                (result.rows[0].returnDate - result.rows[0].rentDate) /
+                DAYS_MILISECONDS;
+
+            if (keptDays > result.rows[0].daysRented) {
+                const delayFee =
+                    (keptDays - result.rows[0].daysRented) *
+                    result.rows[0].originalPrice;
+
+                await connection.query(
+                    'UPDATE rentals SET "delayFee" = $1 WHERE id = $2;',
+                    [delayFee, id]
+                );
+            }
+
+            res.sendStatus(200);
         }
     } catch (error) {
         res.sendStatus(500);
